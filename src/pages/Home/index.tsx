@@ -3,36 +3,37 @@ import { PRODUCT_ENDPOINT } from '../../enums/endpoint';
 import { IProduct } from '../../shared/interfaces/product.interface';
 import CartProduct from '../../components/CardProduct';
 import useDebounce from '../../hooks/useDebounce';
-import AppButton from '../../components/AppSearch';
 import AppSearch from '../../components/AppSearch';
 
 function Home() {
   const [products, setProducts] = useState<IProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isChangesSearch, setIsChangesSearch] = useState(false);
-  const [error, setError] = useState<any>(null);
+  const [isError, setIsError] = useState<boolean>(false);
   const [page, setPage] = useState<number>(0);
+
+  const limit = 20;
+  const lastProductRef = useRef(null);
   const hasScrollRef = useRef<boolean>(true);
 
   const [searchValue, setSearchValue] = useState<string>('');
   const searchValueDebounce = useDebounce(searchValue, 500);
 
-  const limit = 20;
-
-  const lastProductRef = useRef(null);
-
   const fetchDataProducts = async () => {
     setIsLoading(true);
-    setError(null);
+    setIsError(false);
     try {
       const response = await fetch(
-        `https://dummyjson.com${PRODUCT_ENDPOINT.ALL_PRODUCT}${
-          searchValueDebounce && '/search'
+        `https://dummyjson.com${
+          searchValueDebounce
+            ? PRODUCT_ENDPOINT.SEARCH_PRODUCT
+            : PRODUCT_ENDPOINT.ALL_PRODUCT
         }?limit=${limit}&skip=${page * limit}${
           searchValueDebounce && `&q=${searchValueDebounce}`
         }`
       );
       const data = await response.json();
+
       if (data.products.length === 0) {
         hasScrollRef.current = false;
         setIsLoading(false);
@@ -44,16 +45,17 @@ function Home() {
         if (isChangesSearch) {
           setProducts(data.products);
           setIsChangesSearch(false);
-          setPage(prev => prev + 1);
+          setPage((prev) => prev + 1);
         } else {
-          setProducts(prevProducts => [...prevProducts, ...data.products]);
-          setPage(prev => prev + 1);
+          setProducts((prevProducts) => [...prevProducts, ...data.products]);
+          setPage((prev) => prev + 1);
         }
         setIsLoading(false);
         hasScrollRef.current = true;
       }
     } catch (error) {
-      setError(error);
+      console.log('error', error);
+      setIsError(true);
       setIsLoading(false);
     }
   };
@@ -62,6 +64,12 @@ function Home() {
     if (entries[0].isIntersecting && hasScrollRef.current) {
       fetchDataProducts();
     }
+  };
+
+  const handleOnChangeSearch = (value: string) => {
+    setSearchValue(value);
+    setIsChangesSearch(true);
+    setPage(0);
   };
 
   useEffect(() => {
@@ -104,12 +112,6 @@ function Home() {
     }
   });
 
-  const handleOnChangeSearch = (value: string) => {
-    setSearchValue(value);
-    setIsChangesSearch(true);
-    setPage(0);
-  };
-
   return (
     <div className="container gutter">
       <div className="row gy-2 gx-2 gy-sm-3  gx-sm-3">
@@ -123,7 +125,7 @@ function Home() {
         {products.length > 0 ? (
           renderListProduct
         ) : (
-          <h3 className="text-center">Không tìm thấy sản phẩm</h3>
+          <h3 className="text-center">No data</h3>
         )}
 
         {isLoading && (
@@ -132,7 +134,7 @@ function Home() {
           </div>
         )}
 
-        {error && !isLoading && (
+        {isError && !isLoading && (
           <div className="col col-12 text-center">Opps...</div>
         )}
       </div>
