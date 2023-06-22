@@ -120,7 +120,7 @@ function Home() {
           <AppSearch value={searchValue} onChange={handleOnChangeSearch} />
         </div>
 
-        {products.length > 0 && !isLoading ? (
+        {products.length > 0 ? (
           renderListProduct
         ) : (
           <h3 className="text-center">Không tìm thấy sản phẩm</h3>
