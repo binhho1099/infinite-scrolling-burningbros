@@ -1,10 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { PRODUCT_ENDPOINT } from '../../enums/endpoint';
-import { IProduct } from '../../shared/interfaces/product.interface';
-import CartProduct from '../../components/CardProduct';
-import useDebounce from '../../hooks/useDebounce';
-import AppButton from '../../components/AppSearch';
+import { useEffect, useRef, useState } from 'react';
 import AppSearch from '../../components/AppSearch';
+import CartProduct from '../../components/CardProduct';
+import { PRODUCT_ENDPOINT } from '../../enums/endpoint';
+import useDebounce from '../../hooks/useDebounce';
+import { IProduct } from '../../shared/interfaces/product.interface';
 
 function Home() {
   const [products, setProducts] = useState<IProduct[]>([]);
@@ -69,12 +68,12 @@ function Home() {
       threshold: 0.5,
     });
 
-    if (observer && lastProductRef.current) {
-      observer.observe(lastProductRef.current);
+    if (observer && lastProductRef?.current) {
+      observer.observe(lastProductRef?.current);
     }
 
     return () => {
-      if (lastProductRef.current) {
+      if (lastProductRef?.current) {
         observer.disconnect();
       }
     };
