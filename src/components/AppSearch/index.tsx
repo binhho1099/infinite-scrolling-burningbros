@@ -15,7 +15,7 @@ function AppSearch({ value, onChange }: IAppSearchProps) {
         onChange={e => {
           onChange(e.target.value);
         }}
-        placeholder="Enter name product ..."
+        placeholder="Enter name product to search ..."
         className="w-50"
       />
     </div>
