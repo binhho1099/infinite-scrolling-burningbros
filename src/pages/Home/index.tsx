@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import AppSearch from '../../components/AppSearch';
 import CartProduct from '../../components/CardProduct';
 import { PRODUCT_ENDPOINT } from '../../enums/endpoint';
@@ -8,121 +8,102 @@ import { IProduct } from '../../shared/interfaces/product.interface';
 function Home() {
   const [products, setProducts] = useState<IProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isChangesSearch, setIsChangesSearch] = useState(false);
   const [error, setError] = useState<any>(null);
-  const [page, setPage] = useState<number>(0);
-  const hasScrollRef = useRef<boolean>(true);
+  const [page, setPage] = useState(0);
+  const hasMoreRef = useRef(true);
 
-  const [searchValue, setSearchValue] = useState<string>('');
+  const [searchValue, setSearchValue] = useState('');
   const searchValueDebounce = useDebounce(searchValue, 500);
 
   const limit = 20;
+  const lastProductRef = useRef<HTMLDivElement | null>(null);
+  const observer = useRef<IntersectionObserver | null>(null);
 
-  const lastProductRef = useRef(null);
+  const fetchDataProducts = useCallback(async () => {
+    if (isLoading || !hasMoreRef.current) return;
 
-  const fetchDataProducts = async () => {
     setIsLoading(true);
     setError(null);
+
     try {
-      const response = await fetch(
-        `https://dummyjson.com${PRODUCT_ENDPOINT.ALL_PRODUCT}${
-          searchValueDebounce && '/search'
-        }?limit=${limit}&skip=${page * limit}${
-          searchValueDebounce && `&q=${searchValueDebounce}`
-        }`
-      );
-      const data = await response.json();
-      if (data.products.length === 0) {
-        hasScrollRef.current = false;
-        setIsLoading(false);
-        if (isChangesSearch) {
-          setProducts(data.products);
-          setIsChangesSearch(false);
-        }
+      const base = `https://dummyjson.com${PRODUCT_ENDPOINT.ALL_PRODUCT}`;
+      const url = searchValueDebounce
+        ? `${base}/search?limit=${limit}&skip=${page * limit}&q=${searchValueDebounce}`
+        : `${base}?limit=${limit}&skip=${page * limit}`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      const newProducts = data.products ?? [];
+
+      if (page === 0) {
+        setProducts(newProducts); // search mới → reset
       } else {
-        if (isChangesSearch) {
-          setProducts(data.products);
-          setIsChangesSearch(false);
-          setPage(prev => prev + 1);
-        } else {
-          setProducts(prevProducts => [...prevProducts, ...data.products]);
-          setPage(prev => prev + 1);
-        }
-        setIsLoading(false);
-        hasScrollRef.current = true;
+        setProducts(prev => [...prev, ...newProducts]);
       }
-    } catch (error) {
-      setError(error);
-      setIsLoading(false);
-    }
-  };
 
-  const handleObserver = (entries: any) => {
-    if (entries[0].isIntersecting && hasScrollRef.current) {
-      fetchDataProducts();
+      hasMoreRef.current = newProducts.length === limit;
+      setPage(prev => prev + 1);
+    } catch (err) {
+      setError(err);
     }
-  };
 
+    setIsLoading(false);
+  }, [page, searchValueDebounce, isLoading]);
+
+  // Reset khi search
   useEffect(() => {
-    const observer = new IntersectionObserver(handleObserver, {
-      threshold: 0.5,
-    });
-
-    if (observer && lastProductRef?.current) {
-      observer.observe(lastProductRef?.current);
-    }
-
-    return () => {
-      if (lastProductRef?.current) {
-        observer.disconnect();
-      }
-    };
-  }, [products]);
-
-  useEffect(() => {
-    fetchDataProducts();
+    setProducts([]);
+    setPage(0);
+    hasMoreRef.current = true;
   }, [searchValueDebounce]);
 
-  const renderListProduct = products.map((product, index) => {
-    if (products.length === index + 1) {
-      return (
-        <div
-          className="col col-6  col-xl-3 col-lg-4"
-          key={product.id}
-          ref={lastProductRef}
-        >
-          <CartProduct product={product} />
-        </div>
-      );
-    } else {
-      return (
-        <div className="col col-6  col-xl-3 col-lg-4" key={product.id}>
-          <CartProduct product={product} />
-        </div>
-      );
-    }
-  });
+  // Fetch mỗi khi page thay đổi
+  useEffect(() => {
+    fetchDataProducts();
+  }, [page, fetchDataProducts]);
 
-  const handleOnChangeSearch = (value: string) => {
+  // Intersection Observer
+  useEffect(() => {
+    if (observer.current) observer.current.disconnect();
+
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMoreRef.current && !isLoading) {
+        setPage(prev => prev + 1);
+      }
+    });
+
+    if (lastProductRef.current) {
+      observer.current.observe(lastProductRef.current);
+    }
+  }, [products, isLoading]);
+
+  const handleSearchChange = (value: string) => {
     setSearchValue(value);
-    setIsChangesSearch(true);
-    setPage(0);
   };
 
   return (
     <div className="container gutter">
-      <div className="row gy-2 gx-2 gy-sm-3  gx-sm-3">
-        <div
-          className="p-3 bg-light position-sticky "
-          style={{ top: 0, zIndex: 1 }}
-        >
-          <AppSearch value={searchValue} onChange={handleOnChangeSearch} />
+      <div className="row gy-2 gx-2 gy-sm-3 gx-sm-3">
+        <div className="p-3 bg-light position-sticky" style={{ top: 0, zIndex: 1 }}>
+          <AppSearch value={searchValue} onChange={handleSearchChange} />
         </div>
 
         {products.length > 0 ? (
-          renderListProduct
+          products.map((product, index) => {
+            const isLast = index === products.length - 1;
+            return (
+              <div
+                key={product.id}
+                className="col col-6 col-xl-3 col-lg-4"
+                ref={isLast ? lastProductRef : null}
+              >
+                <CartProduct product={product} />
+              </div>
+            );
+          })
         ) : (
-          <h3 className="text-center">Không tìm thấy sản phẩm</h3>
+          !isLoading && <h3 className="text-center">Không tìm thấy sản phẩm</h3>
         )}
 
         {isLoading && (
@@ -131,9 +112,7 @@ function Home() {
           </div>
         )}
 
-        {error && !isLoading && (
-          <div className="col col-12 text-center">Opps...</div>
-        )}
+        {error && !isLoading && <div className="col col-12 text-center">Opps…</div>}
       </div>
     </div>
   );
